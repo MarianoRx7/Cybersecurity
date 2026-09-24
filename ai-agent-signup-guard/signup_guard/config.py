@@ -22,3 +22,10 @@ class Settings:
     trust_proxy: bool = False           # honour X-Forwarded-For
     trusted_agents_file: str = os.path.join(os.path.dirname(__file__), "..", "trusted_agents.json")
     max_signature_age: int = 3600       # seconds a Web Bot Auth signature may live
+    # Passkey step-up. The origin must match what the browser shows in the address bar.
+    origins: list[str] = field(default_factory=lambda: os.environ.get(
+        "SIGNUP_GUARD_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(","))
+    rp_id: str = os.environ.get("SIGNUP_GUARD_RP_ID", "")    # default: host of the first origin (passkeys need a domain, not an IP)
+    # Attack dashboard at /admin. Unset -> a random token is generated and printed at startup.
+    admin_token: str = field(default_factory=lambda: os.environ.get("SIGNUP_GUARD_ADMIN_TOKEN") or secrets.token_urlsafe(18))
+    event_log_path: str | None = os.environ.get("SIGNUP_GUARD_EVENT_LOG")

@@ -43,7 +43,7 @@ class HumanSignupTests(unittest.TestCase):
 
     def test_disposable_email_requires_step_up(self):
         status, body = signup(self.app, self._fill_form(), fields={"email": "x@mailinator.com"})
-        self.assertEqual(body["next_steps"], ["verify_email", "step_up_verification"])
+        self.assertEqual(body["next_steps"], ["verify_email", "passkey_verification"])
         link = self.app.mailer.outbox[-1]["body"]
         _, _, raw = self.app.handle("GET", link, browser_headers(), b"", "203.0.113.5")
         self.assertEqual(json.loads(raw)["status"], "pending_step_up")
@@ -91,7 +91,7 @@ class BotTests(unittest.TestCase):
             self.clock.now += 20
             results.append(signup(self.app, c, fields={"email": f"u{i}@example.org"}))
         self.assertTrue(all(body["next_steps"] == ["verify_email"] for _, body in results[:5]))
-        self.assertEqual(results[5][1]["next_steps"], ["verify_email", "step_up_verification"])
+        self.assertEqual(results[5][1]["next_steps"], ["verify_email", "passkey_verification"])
         self.assertEqual(results[-1][0], 403)
 
 
@@ -114,7 +114,7 @@ class UndeclaredAIAgentTests(unittest.TestCase):
         c = get_challenge(self.app, headers)
         self.clock.now += 30
         status, body = signup(self.app, c, headers=headers)
-        self.assertEqual(body["next_steps"], ["verify_email", "step_up_verification"])
+        self.assertEqual(body["next_steps"], ["verify_email", "passkey_verification"])
 
     def test_forged_signature_headers_are_not_trusted(self):
         headers = browser_headers(**{"Signature-Agent": '"https://agent.example"',
@@ -123,7 +123,7 @@ class UndeclaredAIAgentTests(unittest.TestCase):
         c = get_challenge(self.app, headers)
         self.clock.now += 30
         status, body = signup(self.app, c, headers=headers)
-        self.assertEqual(body["next_steps"], ["verify_email", "step_up_verification"])
+        self.assertEqual(body["next_steps"], ["verify_email", "passkey_verification"])
 
 
 class SignedAgentTests(unittest.TestCase):

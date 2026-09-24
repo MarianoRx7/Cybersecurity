@@ -8,7 +8,8 @@ from dataclasses import dataclass
 
 # Categories drive the response: "ai_agent" signals point the client at the
 # agent registration path, the rest are generic bot/abuse indicators.
-AI_AGENT, AUTOMATION, BOT, ABUSE = "ai_agent", "automation", "bot", "abuse"
+AI_AGENT, COMPUTER_USE, AUTOMATION, BOT, ABUSE = "ai_agent", "computer_use", "automation", "bot", "abuse"
+AGENT_CATEGORIES = frozenset({AI_AGENT, COMPUTER_USE})
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,15 @@ def canary_signal(fields: dict, canary: str) -> Signal | None:
     return None
 
 
+def visible_trap_signal(fields: dict) -> Signal | None:
+    """A visible fine-print checkbox addressed to AI agents. People skim past
+    it; screenshot-driven computer-use agents read the whole screen and tend
+    to obey. Unlike the DOM canary, it works on agents that never read HTML."""
+    if str(fields.get("agent_ack", "")).lower() in ("1", "true", "on", "yes"):
+        return Signal("ticked_agent_checkbox", 60, AI_AGENT)
+    return None
+
+
 def form_signals(fields: dict, honeypot_field: str, issued_at: float,
                  min_fill_seconds: float, now: float) -> list[Signal]:
     found = []
@@ -106,6 +116,37 @@ def telemetry_signals(telemetry) -> list[Signal]:
         found.append(Signal("no_keystrokes", 10, AUTOMATION))
     if telemetry.get("untrusted_events"):
         found.append(Signal("synthetic_input_events", 35, AUTOMATION))
+    return found
+
+
+def behavior_signals(behavior) -> list[Signal]:
+    """Detect computer-use agents: AI that sees the screen through screenshots
+    and drives the real mouse and keyboard. Their input is "trusted" and their
+    browser is genuine, but the screenshot -> think -> act loop leaves marks:
+    the cursor teleports to targets, clicks land dead-centre, typing has
+    machine-even rhythm, and bursts of action alternate with long still pauses.
+    Each signal is modest; together they are strong."""
+    if not isinstance(behavior, dict):
+        return []
+    num = lambda k: float(behavior.get(k) or 0)
+    found = []
+    clicks, keys = num("clicks"), num("keys")
+    if clicks >= 2 and num("teleport_clicks") / clicks >= 0.75:
+        found.append(Signal("cursor_teleports_to_targets", 25, COMPUTER_USE,
+                            f"{int(num('teleport_clicks'))}/{int(clicks)} clicks"))
+    if clicks >= 2 and behavior.get("click_center_offset") is not None and num("click_center_offset") < 0.08:
+        found.append(Signal("pixel_perfect_clicks", 20, COMPUTER_USE,
+                            f"mean offset {num('click_center_offset'):.2f}"))
+    if num("path_samples") >= 2 and num("path_straightness") > 0.985:
+        found.append(Signal("robotic_mouse_paths", 15, COMPUTER_USE))
+    if keys >= 8 and behavior.get("key_interval_cv") is not None and num("key_interval_cv") < 0.2:
+        found.append(Signal("uniform_typing_rhythm", 20, COMPUTER_USE,
+                            f"cv {num('key_interval_cv'):.2f}"))
+    # People pause too, but while filling a form they are mostly active; a
+    # screenshot loop is frozen most of the time and acts in short bursts.
+    if num("idle_gaps") >= 3 and num("idle_ratio") > 0.7:
+        found.append(Signal("act_then_freeze_rhythm", 15, COMPUTER_USE,
+                            f"{int(num('idle_gaps'))} gaps, {num('idle_ratio'):.0%} idle"))
     return found
 
 
