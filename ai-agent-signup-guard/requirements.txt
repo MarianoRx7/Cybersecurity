@@ -1,0 +1,2 @@
+# Only needed for verifying signed AI agents (Web Bot Auth / Ed25519).
+cryptography>=41

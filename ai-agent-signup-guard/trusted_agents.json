@@ -1,0 +1,4 @@
+{
+  "_comment": "keyid -> agent operator and base64 raw Ed25519 public key. In production, fetch these from the operator's /.well-known/http-message-signatures-directory instead.",
+  "agents": {}
+}
