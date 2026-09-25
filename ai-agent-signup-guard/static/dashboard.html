@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signup Attack Monitor</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --series: #2a78d6; --series-wash: rgba(42,120,214,0.10);
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+    --good-ink: #006300; --critical-ink: #b42f2f; --warning-ink: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+      --series: #3987e5; --series-wash: rgba(57,135,229,0.14);
+      --good-ink: #0ca30c; --critical-ink: #e66767; --warning-ink: #fab219;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --series: #3987e5; --series-wash: rgba(57,135,229,0.14);
+    --good-ink: #0ca30c; --critical-ink: #e66767; --warning-ink: #fab219;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  h2 { font-size: 14px; margin: 0 0 2px; font-weight: 600; }
+  .sub { color: var(--ink-2); font-size: 12.5px; margin: 0 0 12px; }
+  .spacer { flex: 1; }
+  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12.5px; }
+  .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .live.stale::before { background: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ring); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { border: 0; background: none; color: var(--ink-2); padding: 6px 12px; font: inherit; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--series-wash); color: var(--ink); font-weight: 600; }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile .label { color: var(--ink-2); font-size: 12.5px; }
+  .tile .value { font-size: 28px; font-weight: 600; margin-top: 2px; }
+  .tile .note { color: var(--muted); font-size: 12px; }
+  .hero .value { font-size: 48px; line-height: 1.05; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 240px; overflow: visible; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
+         padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; white-space: nowrap; z-index: 2; }
+  .tip b { font-weight: 600; }
+  .tip .row { display: flex; align-items: center; gap: 6px; }
+  .bars { display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 8px 10px; align-items: center; }
+  .bars .name { color: var(--ink-2); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bars .track { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .bars .fill { height: 16px; background: var(--series); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .bars .num { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  th.n { text-align: right; }
+  .scroll { overflow-x: auto; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge::before { font-size: 11px; }
+  .b-allow { color: var(--good-ink); } .b-allow::before { content: "✓"; }
+  .b-challenge { color: var(--warning-ink); } .b-challenge::before { content: "!"; font-weight: 800; }
+  .b-deny { color: var(--critical-ink); } .b-deny::before { content: "✕"; }
+  .b-info { color: var(--ink-2); } .b-info::before { content: "•"; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--ring); color: var(--ink-2); white-space: nowrap; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .muted { color: var(--muted); }
+  .feed td:first-child { white-space: nowrap; }
+  .feedwrap { max-height: 640px; overflow-y: auto; }
+  .feed thead th { position: sticky; top: 0; background: var(--surface); }
+  .linkbtn { background: none; border: 0; color: var(--series); cursor: pointer; font: inherit; font-size: 12.5px; padding: 0; }
+  #login { max-width: 420px; margin: 12vh auto; }
+  #login input { width: 100%; padding: 8px 10px; margin: 10px 0; border: 1px solid var(--axis); border-radius: 8px; background: var(--page); color: var(--ink); font: inherit; }
+  #login button { padding: 8px 14px; border-radius: 8px; border: 0; background: var(--series); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  #login .err { color: var(--critical-ink); font-size: 13px; min-height: 1.2em; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (max-width: 560px) { .hero .value { font-size: 40px; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <section id="login" class="card" hidden>
+    <h1>Signup attack monitor</h1>
+    <p class="sub">Enter the admin token printed in the server console when it started.</p>
+    <form id="loginForm">
+      <label for="token" class="sr-only">Admin token</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Admin token">
+      <div class="err" id="loginErr" role="alert"></div>
+      <button type="submit">Open dashboard</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <header>
+      <h1>Signup attack monitor</h1>
+      <span class="live" id="live">Live</span>
+      <span class="spacer"></span>
+      <div class="seg" role="group" aria-label="Time range" id="range">
+        <button type="button" data-w="15" aria-pressed="true">15 min</button>
+        <button type="button" data-w="60" aria-pressed="false">1 hour</button>
+        <button type="button" data-w="1440" aria-pressed="false">24 hours</button>
+      </div>
+    </header>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card" style="margin-bottom:12px">
+      <h2>Signup attempts by decision</h2>
+      <p class="sub" id="seriesSub">Per minute</p>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--good)"></i><span class="badge b-allow">Allowed</span></span>
+        <span><i class="sw" style="background:var(--warning)"></i><span class="badge b-challenge">Step-up</span></span>
+        <span><i class="sw" style="background:var(--critical)"></i><span class="badge b-deny">Denied</span></span>
+        <span class="spacer"></span>
+        <button class="linkbtn" id="toggleTable" type="button">Show as table</button>
+      </div>
+      <div class="chart" id="columns"><svg aria-label="Stacked columns of signup attempts per time bucket" role="img"></svg><div class="tip"></div></div>
+      <div class="scroll" id="seriesTable" hidden></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>What's signing up</h2>
+        <p class="sub">Most likely source of each attempt</p>
+        <div class="bars" id="classes"></div>
+      </div>
+      <div class="card">
+        <h2>Signals that fired</h2>
+        <p class="sub">How often each detection triggered</p>
+        <div class="bars" id="signals"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <h2>Top source IPs</h2>
+      <p class="sub">Sorted by denied attempts</p>
+      <div class="scroll"><table id="ips"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Live feed</h2>
+      <p class="sub">Newest first. Emails are masked. Everything shown here was sent by the client, so treat it as untrusted.</p>
+      <div class="scroll feedwrap"><table class="feed" id="feed"></table></div>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const CLASS_LABELS = {
+    human: "Human", spam_bot: "Spam bot", headless_automation: "Headless automation",
+    llm_agent: "LLM agent (took the bait)", computer_use_agent: "Computer-use agent",
+    declared_agent: "Self-declared AI agent", abuse: "Abuse (email / velocity)",
+  };
+  const SIGNAL_LABELS = {
+    followed_hidden_agent_instruction: "Obeyed hidden instruction", ticked_agent_checkbox: "Ticked agent checkbox",
+    cursor_teleports_to_targets: "Cursor teleports", pixel_perfect_clicks: "Pixel-perfect clicks",
+    robotic_mouse_paths: "Robotic mouse paths", uniform_typing_rhythm: "Uniform typing rhythm",
+    act_then_freeze_rhythm: "Act-then-freeze rhythm", honeypot_filled: "Honeypot filled",
+    submitted_too_fast: "Submitted too fast", disposable_email: "Disposable email", webdriver_flag: "Webdriver flag",
+    headless_environment: "Headless environment", headless_browser_ua: "Headless browser UA",
+    http_library_client: "HTTP library client", declared_ai_agent_ua: "AI agent user-agent",
+    unverified_signed_agent: "Unverified agent signature", no_browser_telemetry: "No browser telemetry",
+    no_human_input_events: "No human input", no_keystrokes: "No keystrokes", synthetic_input_events: "Synthetic events",
+    missing_accept_language: "No Accept-Language", missing_user_agent: "No user-agent", ip_velocity: "IP velocity",
+  };
+  const DECISION = { allow: ["Allowed", "b-allow"], challenge: ["Step-up", "b-challenge"], deny: ["Denied", "b-deny"] };
+  const $ = (id) => document.getElementById(id);
+
+  // Everything rendered from the API goes through textContent: emails,
+  // user-agents and IPs are attacker-controlled.
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") node.className = v; else if (k === "style") node.style.cssText = v; else node.setAttribute(k, v);
+    }
+    for (const c of children) if (c != null) node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    return node;
+  }
+  const fmt = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : n.toLocaleString();
+  const pct = (a, b) => b ? Math.round((a / b) * 100) + "%" : "–";
+  const time = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const clock = (ts, withDay) => new Date(ts * 1000).toLocaleString([], withDay
+    ? { weekday: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" });
+
+  let token = null, windowMinutes = 15, last = null, timer = null;
+  try { token = sessionStorage.getItem("sg_admin_token"); } catch (e) {}
+  try { windowMinutes = Number(localStorage.getItem("sg_window")) || 15; } catch (e) {}
+
+  async function load() {
+    try {
+      const res = await fetch(`/admin/api/summary?window=${windowMinutes}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 401) return showLogin("That token was not accepted.");
+      last = await res.json();
+      render(last);
+      $("live").classList.remove("stale");
+      $("live").textContent = `Live · updated ${time(last.now)}`;
+    } catch (e) {
+      $("live").classList.add("stale");
+      $("live").textContent = "Disconnected, retrying…";
+    }
+  }
+
+  function showLogin(msg) {
+    clearInterval(timer);
+    $("app").hidden = true; $("login").hidden = false;
+    $("loginErr").textContent = msg || "";
+    $("token").focus();
+  }
+  function start() {
+    $("login").hidden = true; $("app").hidden = false;
+    for (const b of $("range").querySelectorAll("button")) b.setAttribute("aria-pressed", String(Number(b.dataset.w) === windowMinutes));
+    load(); clearInterval(timer); timer = setInterval(load, 4000);
+  }
+  $("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    token = $("token").value.trim();
+    try { sessionStorage.setItem("sg_admin_token", token); } catch (err) {}
+    start();
+  });
+  $("range").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    windowMinutes = Number(b.dataset.w);
+    try { localStorage.setItem("sg_window", String(windowMinutes)); } catch (err) {}
+    for (const x of $("range").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    load();
+  });
+  $("toggleTable").addEventListener("click", () => {
+    const t = $("seriesTable"), showing = !t.hidden;
+    t.hidden = showing; $("columns").hidden = !showing;
+    $("toggleTable").textContent = showing ? "Show as table" : "Show as chart";
+  });
+  addEventListener("resize", () => last && renderColumns(last));
+
+  // ---- render -------------------------------------------------------------
+  function render(d) {
+    const t = d.totals;
+    const tiles = [
+      ["Blocked or stepped up", pct(t.deny + t.challenge, t.attempts), `${fmt(t.deny + t.challenge)} of ${fmt(t.attempts)} attempts`, "hero"],
+      ["Signup attempts", fmt(t.attempts), `last ${d.window_minutes >= 1440 ? "24 hours" : d.window_minutes + " min"}`],
+      ["Allowed", fmt(t.allow), pct(t.allow, t.attempts) + " of attempts"],
+      ["Step-up required", fmt(t.challenge), "passkey before full access"],
+      ["Denied", fmt(t.deny), pct(t.deny, t.attempts) + " of attempts"],
+      ["AI agents detected", fmt(t.agents_detected), "LLM, computer-use, declared"],
+      ["Signed agent registrations", fmt(t.agent_registrations), "sent to owner approval"],
+      ["Rejected requests", fmt(t.invalid_requests), "bad token, replay, no PoW"],
+    ];
+    $("tiles").replaceChildren(...tiles.map(([label, value, note, cls]) =>
+      el("div", { class: "card tile " + (cls || "") }, el("div", { class: "label" }, label),
+         el("div", { class: "value" }, value), el("div", { class: "note" }, note))));
+    renderColumns(d);
+    renderSeriesTable(d);
+    renderBars($("classes"), d.classifications.map(([k, v]) => [CLASS_LABELS[k] || k, v]));
+    renderBars($("signals"), d.top_signals.map(([k, v]) => [SIGNAL_LABELS[k] || k, v]));
+    renderIps(d.top_ips);
+    renderFeed(d.recent);
+  }
+
+  function renderBars(root, rows) {
+    if (!rows.length) return root.replaceChildren(el("div", { class: "empty", style: "grid-column:1/-1" }, "No data yet"));
+    const max = Math.max(...rows.map((r) => r[1]));
+    root.replaceChildren(...rows.flatMap(([name, v]) => [
+      el("div", { class: "name", title: name }, name),
+      el("div", { class: "track", title: `${name}: ${v}` },
+         el("div", { class: "fill", style: `width:calc((100% - 44px) * ${v / max})` }), el("span", { class: "num" }, fmt(v))),
+    ]));
+  }
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+
+  function renderColumns(d) {
+    const wrap = $("columns"), svg = wrap.querySelector("svg"), tip = wrap.querySelector(".tip");
+    const W = Math.max(280, wrap.clientWidth), H = 240, m = { t: 8, r: 8, b: 26, l: 36 };
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.replaceChildren();
+    const s = d.series, n = s.length;
+    const bucketLabel = d.bucket_seconds >= 3600 ? "hour" : d.bucket_seconds > 60 ? `${d.bucket_seconds / 60} min` : "minute";
+    $("seriesSub").textContent = `Attempts per ${bucketLabel}`;
+    const totals = s.map((b) => b.allow + b.challenge + b.deny);
+    const maxV = Math.max(4, ...totals);
+    const step = Math.pow(10, Math.floor(Math.log10(maxV)));
+    const nice = [1, 2, 2.5, 5, 10].map((f) => f * step).find((v) => maxV / v <= 4) || step * 10;
+    const top = Math.ceil(maxV / nice) * nice;
+    const x0 = m.l, x1 = W - m.r, y0 = H - m.b, y1 = m.t;
+    const y = (v) => y0 - (v / top) * (y0 - y1);
+    for (let v = 0; v <= top; v += nice) {
+      svg.append(svgEl("line", { x1: x0, x2: x1, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      const lab = svgEl("text", { x: x0 - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)" });
+      lab.textContent = fmt(v); svg.append(lab);
+    }
+    const band = (x1 - x0) / n, bw = Math.max(2, Math.min(24, band * 0.7));
+    const tickEvery = Math.ceil(n / Math.max(2, Math.floor((x1 - x0) / 70)));
+    const withDay = d.window_minutes > 720;
+    s.forEach((b, i) => {
+      const cx = x0 + band * i + band / 2, left = cx - bw / 2;
+      let base = 0;
+      const segs = [["allow", "var(--good)"], ["challenge", "var(--warning)"], ["deny", "var(--critical)"]].filter(([k]) => b[k] > 0);
+      segs.forEach(([k, color], j) => {
+        const yTop = y(base + b[k]), yBot = y(base) - (j > 0 ? 2 : 0);   // 2px surface gap between segments
+        const h = Math.max(1, yBot - yTop);
+        const isTop = j === segs.length - 1, r = isTop ? Math.min(4, h, bw / 2) : 0;
+        const dPath = `M${left},${yBot} V${yTop + r} Q${left},${yTop} ${left + r},${yTop} H${left + bw - r} Q${left + bw},${yTop} ${left + bw},${yTop + r} V${yBot} Z`;
+        svg.append(svgEl("path", { d: dPath, fill: color }));
+        base += b[k];
+      });
+      if (i % tickEvery === 0) {
+        const lab = svgEl("text", { x: cx, y: H - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)" });
+        lab.textContent = clock(b.t, withDay); svg.append(lab);
+      }
+      const hit = svgEl("rect", { x: x0 + band * i, y: y1, width: band, height: y0 - y1, fill: "transparent" });
+      hit.addEventListener("pointerenter", () => {
+        const rows = [["deny", "var(--critical)"], ["challenge", "var(--warning)"], ["allow", "var(--good)"]].map(([k, c]) =>
+          el("div", { class: "row" }, el("i", { class: "sw", style: `background:${c}` }), el("b", {}, fmt(b[k])), " " + DECISION[k][0]));
+        tip.replaceChildren(el("div", { class: "muted" }, `${clock(b.t, withDay)} · ${fmt(totals[i])} attempts`), ...rows);
+        tip.style.display = "block";
+        const px = (cx / W) * wrap.clientWidth;
+        tip.style.left = Math.min(wrap.clientWidth - tip.offsetWidth, Math.max(0, px + 12)) + "px";
+        tip.style.top = "8px";
+      });
+      hit.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+      svg.append(hit);
+    });
+  }
+
+  function renderSeriesTable(d) {
+    const withDay = d.window_minutes > 720;
+    const rows = d.series.filter((b) => b.allow + b.challenge + b.deny > 0).reverse();
+    const table = el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Time"), el("th", { class: "n" }, "Allowed"),
+      el("th", { class: "n" }, "Step-up"), el("th", { class: "n" }, "Denied"))),
+      el("tbody", {}, ...rows.map((b) => el("tr", {}, el("td", {}, clock(b.t, withDay)), el("td", { class: "n" }, b.allow),
+        el("td", { class: "n" }, b.challenge), el("td", { class: "n" }, b.deny)))));
+    $("seriesTable").replaceChildren(rows.length ? table : el("div", { class: "empty" }, "No data yet"));
+  }
+
+  function renderIps(rows) {
+    const head = el("thead", {}, el("tr", {}, el("th", {}, "IP address"), el("th", { class: "n" }, "Attempts"),
+      el("th", { class: "n" }, "Denied"), el("th", { class: "n" }, "Max score"), el("th", {}, "Most likely"), el("th", {}, "Last seen")));
+    const body = el("tbody", {}, ...rows.map((r) => el("tr", {},
+      el("td", { class: "mono" }, r.ip), el("td", { class: "n" }, r.attempts), el("td", { class: "n" }, r.denied),
+      el("td", { class: "n" }, r.max_score), el("td", {}, CLASS_LABELS[r.top_class] || r.top_class), el("td", { class: "muted" }, time(r.last_seen)))));
+    $("ips").replaceChildren(head, rows.length ? body : el("tbody", {}, el("tr", {}, el("td", { colspan: 6, class: "empty" }, "No data yet"))));
+  }
+
+  function renderFeed(events) {
+    const head = el("thead", {}, el("tr", {}, el("th", {}, "Time"), el("th", {}, "Outcome"), el("th", {}, "What"),
+      el("th", {}, "Source"), el("th", { class: "n" }, "Score"), el("th", {}, "Signals")));
+    const rows = events.map((e) => {
+      let badge, what, score = "", chips = [];
+      if (e.type === "signup") {
+        const [label, cls] = DECISION[e.decision];
+        badge = el("span", { class: "badge " + cls }, label);
+        what = CLASS_LABELS[e.classification] || e.classification;
+        score = e.score;
+        chips = e.signals.map((s) => el("span", { class: "chip", title: (e.details && e.details[s]) || s }, SIGNAL_LABELS[s] || s));
+      } else if (e.type === "agent_signup") {
+        badge = el("span", { class: "badge b-info" }, "Agent path");
+        what = `Signed agent: ${e.operator}`;
+      } else if (e.type === "step_up") {
+        badge = el("span", { class: "badge " + (e.ok ? "b-allow" : "b-deny") }, e.ok ? "Passkey OK" : "Passkey failed");
+        what = e.ok ? "Step-up completed" : e.reason;
+      } else {
+        badge = el("span", { class: "badge b-deny" }, "Rejected");
+        what = e.reason;
+      }
+      return el("tr", {}, el("td", { class: "muted" }, time(e.ts)), el("td", {}, badge),
+        el("td", {}, el("div", {}, what), e.email ? el("div", { class: "muted" }, e.email) : null),
+        el("td", {}, el("div", { class: "mono" }, e.ip), e.ua ? el("div", { class: "muted", title: e.ua, style: "max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, e.ua) : null),
+        el("td", { class: "n" }, score), el("td", {}, el("div", { class: "chips" }, ...chips)));
+    });
+    $("feed").replaceChildren(head, el("tbody", {}, ...(rows.length ? rows : [el("tr", {}, el("td", { colspan: 6, class: "empty" }, "Waiting for signups…"))])));
+  }
+
+  token ? start() : showLogin();
+})();
+</script>
+</body>
+</html>
