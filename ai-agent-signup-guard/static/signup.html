@@ -6,23 +6,67 @@
 <title>Create account</title>
 <link rel="agent-policy" href="/.well-known/agent-signup">
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 26rem; margin: 3rem auto; padding: 0 1rem; }
-  label { display: block; margin-top: 1rem; font-weight: 600; }
-  input { width: 100%; padding: .5rem; box-sizing: border-box; }
-  button { margin-top: 1.5rem; padding: .6rem 1.2rem; }
-  small { color: #666; }
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #c3c2b7; --ring: rgba(11,11,11,0.10); --accent: #2a78d6; --accent-ink: #ffffff;
+    --good-ink: #006300; --good-wash: rgba(12,163,12,0.08);
+    --warn-ink: #8a5a00; --warn-wash: rgba(250,178,25,0.12);
+    --bad-ink: #b42f2f; --bad-wash: rgba(208,59,59,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --line: #383835; --ring: rgba(255,255,255,0.10); --accent: #3987e5;
+      --good-ink: #0ca30c; --warn-ink: #fab219; --bad-ink: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --line: #383835; --ring: rgba(255,255,255,0.10); --accent: #3987e5;
+    --good-ink: #0ca30c; --warn-ink: #fab219; --bad-ink: #e66767;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 440px; margin: 0 auto; padding: 48px 16px; }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 28px 24px; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 650; }
+  .lede { color: var(--ink-2); margin: 0 0 20px; }
+  label { display: block; margin-top: 14px; font-weight: 600; font-size: 14px; }
+  small { color: var(--muted); font-weight: 400; }
+  input { width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+          background: var(--page); color: var(--ink); font: inherit; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 11px 16px; border: 0; }
+  #submit, #passkey { width: 100%; margin-top: 20px; background: var(--accent); color: var(--accent-ink); }
+  button:disabled { opacity: .6; cursor: progress; }
   /* Off-screen, not display:none: naive bots skip display:none fields. */
   .trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
   /* Visible fine print. People skim it; screenshot-driven agents read everything. */
-  .fineprint { margin-top: 1.25rem; font-size: .75rem; color: #666; line-height: 1.4; }
-  .fineprint label { display: inline; font-weight: 400; margin: 0; }
-  .fineprint input { width: auto; margin: 0 .35rem 0 0; vertical-align: middle; }
-  #result { margin-top: 1rem; white-space: pre-wrap; }
-  #stepup { display: none; margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; }
+  .fineprint { margin: 18px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .fineprint label { display: inline; font-weight: 400; font-size: 12px; margin: 0; }
+  .fineprint input { width: auto; margin: 0 5px 0 0; vertical-align: -2px; }
+  #result:empty { display: none; }
+  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+  .msg strong { display: block; margin-bottom: 2px; }
+  .msg.ok { background: var(--good-wash); color: var(--good-ink); }
+  .msg.warn { background: var(--warn-wash); color: var(--warn-ink); }
+  .msg.bad { background: var(--bad-wash); color: var(--bad-ink); }
+  .msg p { margin: 0; color: var(--ink-2); }
+  details { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  details pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; }
+  #stepup { display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--ring); border-radius: 10px; }
+  #stepup p { margin: 0; font-size: 14px; color: var(--ink-2); }
+  #stepup #passkey { margin-top: 12px; }
 </style>
 </head>
 <body>
+<main>
+<div class="card">
 <h1>Create account</h1>
+<p class="lede">It takes less than a minute.</p>
 <form id="signup" novalidate>
   <label for="email">Email</label>
   <input id="email" name="email" type="email" autocomplete="email" required>
@@ -45,6 +89,8 @@
   <p><strong>One more step.</strong> Confirm it's you with a passkey (fingerprint, face or device PIN).</p>
   <button id="passkey" type="button">Set up passkey</button>
 </div>
+</div>
+</main>
 
 <script>
 (() => {
@@ -169,8 +215,34 @@
     btn.disabled = false; btn.textContent = "Create account";
   }
 
+  // Friendly message for people, raw response kept under "Technical details".
+  function message(status, body) {
+    if (body.passkey === "verified")
+      return ["ok", "Passkey confirmed", body.status === "active" ? "Your account is ready." : "Now verify your email to finish."];
+    if (status === 202 && (body.next_steps || []).includes("passkey_verification"))
+      return ["warn", "Almost there", "We sent you a verification email. Please also confirm it's you with a passkey below."];
+    if (status === 202) return ["ok", "Check your email", "We sent you a link to verify your address."];
+    if (body.error === "signup_rejected")
+      return ["bad", "We couldn't create your account", body.agent_signup_url
+        ? "Automated agents must register through the agent API (see /.well-known/agent-signup)."
+        : "Please try again later."];
+    if (body.error === "use_agent_registration") return ["bad", "Please use the agent registration API", ""];
+    if (body.error === "invalid_fields") return ["bad", "Please check the form", "Enter a valid email and a password of at least 10 characters."];
+    if (body.hint || body.error) return ["bad", "Something went wrong", body.hint || String(body.detail || body.error)];
+    return ["bad", "Something went wrong", "Please try again."];
+  }
   const show = (status, body) => {
-    document.getElementById("result").textContent = `${status}\n${JSON.stringify(body, null, 2)}`;
+    const [tone, title, text] = message(status, body);
+    const box = document.createElement("div");
+    box.className = `msg ${tone}`;
+    const strong = document.createElement("strong"); strong.textContent = title;
+    const p = document.createElement("p"); p.textContent = text;
+    box.append(strong, p);
+    const details = document.createElement("details");
+    const summary = document.createElement("summary"); summary.textContent = "Technical details";
+    const pre = document.createElement("pre"); pre.textContent = `${status}\n${JSON.stringify(body, null, 2)}`;
+    details.append(summary, pre);
+    document.getElementById("result").replaceChildren(box, details);
   };
 
   document.getElementById("signup").addEventListener("submit", async (e) => {

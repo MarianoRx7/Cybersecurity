@@ -12,6 +12,22 @@ that pretend to be people.
 > Set *traps* that only software falls into. Push anything uncertain to
 > *step-up verification* instead of a flat allow or deny.
 
+## Screenshots
+
+| Signup: allowed | Signup: passkey step-up | Signup: AI agent denied |
+|---|---|---|
+| ![Signup allowed](docs/screenshots/signup-allowed.png) | ![Signup needing a passkey](docs/screenshots/signup-step-up.png) | ![AI agent denied](docs/screenshots/signup-denied-agent.png) |
+
+**Attack dashboard** (`/admin`, running with simulated traffic):
+
+![Attack dashboard](docs/screenshots/dashboard-light.png)
+
+More: [empty signup form](docs/screenshots/signup-empty.png) ·
+[signup in dark mode](docs/screenshots/signup-step-up-dark.png) ·
+[dashboard login](docs/screenshots/dashboard-login.png) ·
+[dashboard in dark mode](docs/screenshots/dashboard-dark.png) ·
+[dashboard on mobile](docs/screenshots/dashboard-mobile.png)
+
 ## The layers
 
 | # | Layer | What it catches | Where |
